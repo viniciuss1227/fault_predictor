@@ -1,16 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
-import { obterPrevisaoAtual } from './src/services/forecastService';
+import {
+  StyleSheet,
+  Text,
+  View,
+  ScrollView,
+  SafeAreaView,
+  StatusBar,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  obterPrevisaoAtual,
+  obterAvaliacaoAtividades,
+} from './src/services/forecastService';
 
 export default function App() {
   const [previsao, setPrevisao] = useState(null);
+  const [atividades, setAtividades] = useState([]);
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
     async function carregarDados() {
       try {
-        const dados = await obterPrevisaoAtual();
-        setPrevisao(dados);
+        const [dadosPrevisao, dadosAtividades] = await Promise.all([
+          obterPrevisaoAtual(),
+          obterAvaliacaoAtividades(),
+        ]);
+        setPrevisao(dadosPrevisao);
+        setAtividades(dadosAtividades);
       } catch (erro) {
         console.error('Falha ao obter dados de previsão:', erro);
       } finally {
@@ -24,7 +40,9 @@ export default function App() {
     return (
       <SafeAreaView style={styles.containerCarregamento}>
         <ActivityIndicator size="large" color="#6C5CE7" />
-        <Text style={styles.textoCarregamento}>Carregando previsão da rede...</Text>
+        <Text style={styles.textoCarregamento}>
+          Carregando previsão da rede...
+        </Text>
       </SafeAreaView>
     );
   }
@@ -33,7 +51,6 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0E15" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
         {/* Cabeçalho */}
         <View style={styles.header}>
           <Text style={styles.tagLocalizacao} accessibilityRole="text">
@@ -47,8 +64,12 @@ export default function App() {
           </Text>
         </View>
 
-        {/* Card Principal: Status da Conexão (RQ01) */}
-        <View style={styles.cardPrincipal} accessible={true} accessibilityLabel={`Status da rede: ${previsao?.assessment.label}`}>
+        {/* Card Principal: Status Geral da Conexão (RQ01) */}
+        <View
+          style={styles.cardPrincipal}
+          accessible={true}
+          accessibilityLabel={`Status da rede: ${previsao?.assessment.label}`}
+        >
           <View style={styles.cardPrincipalHeader}>
             <View>
               <Text style={styles.cardLabel}>Classificação Geral</Text>
@@ -63,24 +84,32 @@ export default function App() {
           <View style={styles.gradeMetricas}>
             <View style={styles.itemMetrica}>
               <Text style={styles.metricaLabel}>Latência Média</Text>
-              <Text style={styles.metricaValor}>{previsao?.metrics.predictedAvgRttMs} ms</Text>
+              <Text style={styles.metricaValor}>
+                {previsao?.metrics.predictedAvgRttMs} ms
+              </Text>
             </View>
             <View style={styles.itemMetrica}>
               <Text style={styles.metricaLabel}>Jitter Previsto</Text>
-              <Text style={styles.metricaValor}>{previsao?.metrics.predictedJitterMs} ms</Text>
+              <Text style={styles.metricaValor}>
+                {previsao?.metrics.predictedJitterMs} ms
+              </Text>
             </View>
             <View style={styles.itemMetrica}>
               <Text style={styles.metricaLabel}>Perda de Pacotes</Text>
-              <Text style={styles.metricaValor}>{previsao?.metrics.predictedPacketLossPct}%</Text>
+              <Text style={styles.metricaValor}>
+                {previsao?.metrics.predictedPacketLossPct}%
+              </Text>
             </View>
             <View style={styles.itemMetrica}>
               <Text style={styles.metricaLabel}>Distância da Sonda</Text>
-              <Text style={styles.metricaValor}>{previsao?.probe.distanceKm} km</Text>
+              <Text style={styles.metricaValor}>
+                {previsao?.probe.distanceKm} km
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Card de Recomendação Acessível em Linguagem Simples (RQ04 / ODS 9) */}
+        {/* Card de Orientação de Uso / Linguagem Simples (RQ04 / ODS 9) */}
         <View style={styles.cardRecomendacao} accessible={true}>
           <Text style={styles.recomendacaoTitulo}>Orientação de Uso</Text>
           <Text style={styles.recomendacaoMensagem}>
@@ -91,6 +120,45 @@ export default function App() {
           </Text>
         </View>
 
+        {/* Seção de Atividades Recomendadas (RQ03 / ODS 9) */}
+        <View style={styles.secaoAtividades}>
+          <Text style={styles.tituloSecao} accessibilityRole="header">
+            Atividades Recomendadas
+          </Text>
+
+          {atividades.map((item) => (
+            <View
+              key={item.id}
+              style={styles.cardAtividade}
+              accessible={true}
+              accessibilityLabel={`${item.title}: ${item.statusLabel}`}
+            >
+              <View style={styles.infoAtividade}>
+                <Text style={styles.atividadeTitulo}>{item.title}</Text>
+                <Text style={styles.atividadeDescricao}>{item.statusLabel}</Text>
+              </View>
+
+              <View
+                style={[
+                  styles.badgeAtividade,
+                  {
+                    borderColor: item.recommended ? '#2ECC71' : '#E74C3C',
+                    backgroundColor: item.recommended ? '#143022' : '#331B1B',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeAtividadeTexto,
+                    { color: item.recommended ? '#2ECC71' : '#E74C3C' },
+                  ]}
+                >
+                  {item.status}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -114,6 +182,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     marginBottom: 20,
@@ -203,6 +272,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderLeftWidth: 4,
     borderLeftColor: '#6C5CE7',
+    marginBottom: 20,
   },
   recomendacaoTitulo: {
     color: '#FFFFFF',
@@ -220,5 +290,51 @@ const styles = StyleSheet.create({
     color: '#656889',
     fontSize: 12,
     fontStyle: 'italic',
+  },
+  secaoAtividades: {
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  tituloSecao: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 14,
+  },
+  cardAtividade: {
+    backgroundColor: '#161826',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#24273D',
+  },
+  infoAtividade: {
+    flex: 1,
+    marginRight: 10,
+  },
+  atividadeTitulo: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  atividadeDescricao: {
+    color: '#8E92BC',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  badgeAtividade: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  badgeAtividadeTexto: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
